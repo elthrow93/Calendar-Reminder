@@ -315,98 +315,331 @@
     drawCloud(ctx, (W * 0.72 - cloudDrift * 1.1 + W) % W, H * 0.28, 1.5);
     drawCloud(ctx, (W * 0.88 - cloudDrift * 0.8 + W) % W, H * 0.72, 0.8);
 
-    // ── Plane position ──
-    // Start fully off-screen left, end fully off-screen right
+    // ── Plane leads left→right; string + banner trail BEHIND (to the left) ──
     const planeSize = Math.min(W, H) * 0.13;
     const stringLen = planeSize * 2.2;
     const bannerW = Math.min(380, W * 0.45);
     const bannerH = planeSize * 1.1;
-    const totalWidth = planeSize + stringLen + bannerW;
-    const planeX = -totalWidth + progress * (W + totalWidth);
+    // Plane tip enters from left. Banner trails behind so whole rig width = planeSize + string + banner
+    // We animate planeX so plane itself goes from -planeSize (just off left) to W (just off right)
+    const totalRig = planeSize + stringLen + bannerW;
+    const planeX = -planeSize + progress * (W + totalRig);
     const planeY = H * 0.38;
 
-    // ── String (dashed line) ──
-    const stringStartX = planeX + planeSize * 0.85;
-    const stringY = planeY + planeSize * 0.18;
+    // ── String: attaches to the tail of the illustrated plane, trails leftward ──
+    const stringY = planeY + planeSize * 0.38;
+    const stringStartX = planeX + planeSize * 0.05;  // near the tail end
+    const stringEndX = planeX - stringLen;            // string goes left
+
     ctx.save();
     ctx.setLineDash([8, 6]);
-    ctx.strokeStyle = '#666';
+    ctx.strokeStyle = '#555';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(stringStartX, stringY);
-    ctx.lineTo(stringStartX + stringLen, stringY);
+    ctx.lineTo(stringEndX, stringY);
     ctx.stroke();
     ctx.restore();
 
-    // ── Banner ──
-    const bannerX = stringStartX + stringLen;
-    const bannerY = stringY - bannerH / 2;
-    const radius = 12;
+    // ── Wavy Banner: drawn as a waving ribbon using bezier curves ──
+    const wave = Math.sin(elapsed * 0.003) * 8; // overall vertical bob
+    const waveFreq = elapsed * 0.004;
+    const anchorX = stringEndX;   // right edge of banner (attached to string)
+    const anchorY = stringY;
+    const numSegments = 12;
+    const segW = bannerW / numSegments;
+    const bannerMidY = anchorY + wave;
+    const padding = 18;
+    const titleSize = Math.round(bannerH * 0.32);
+    const timeSize = Math.round(bannerH * 0.25);
 
-    // Shadow
+    // Helper: get wavy Y offset at position t (0=right/anchor, 1=left/tip)
+    function wavyY(t) {
+      // Amplitude grows toward the free (left) end
+      return bannerMidY + Math.sin(waveFreq - t * 2.5) * (t * 14);
+    }
+    function wavyTopY(t) { return wavyY(t) - bannerH * (0.4 + t * 0.08); }
+    function wavyBotY(t) { return wavyY(t) + bannerH * (0.4 + t * 0.08); }
+
+    // Build top and bottom paths across the banner width
+    // Right = anchor (t=0), Left = free tip (t=1)
+    const steps = 40;
+    const topPts = [], botPts = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = anchorX - t * bannerW;
+      topPts.push({ x, y: wavyTopY(t) });
+      botPts.push({ x, y: wavyBotY(t) });
+    }
+
+    // Draw filled banner shape
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.18)';
-    ctx.shadowBlur = 14;
-    ctx.shadowOffsetX = 4;
+    ctx.shadowBlur = 10;
     ctx.shadowOffsetY = 4;
-
-    // Banner body
+    ctx.beginPath();
+    ctx.moveTo(topPts[0].x, topPts[0].y);
+    for (let i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i].x, topPts[i].y);
+    for (let i = botPts.length - 1; i >= 0; i--) ctx.lineTo(botPts[i].x, botPts[i].y);
+    ctx.closePath();
     ctx.fillStyle = '#fffdf0';
-    roundRect(ctx, bannerX, bannerY, bannerW, bannerH, radius);
     ctx.fill();
     ctx.restore();
 
-    // Banner border
+    // Border
+    ctx.save();
     ctx.strokeStyle = '#f0c040';
     ctx.lineWidth = 3;
-    roundRect(ctx, bannerX, bannerY, bannerW, bannerH, radius);
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(topPts[0].x, topPts[0].y);
+    for (let i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i].x, topPts[i].y);
+    for (let i = botPts.length - 1; i >= 0; i--) ctx.lineTo(botPts[i].x, botPts[i].y);
+    ctx.closePath();
     ctx.stroke();
+    ctx.restore();
 
-    // Left notch/arrow on banner
+    // Arrow/notch on the right (anchor) side pointing toward plane
+    const arrowX = anchorX;
+    const arrowY = anchorY + wave;
     ctx.fillStyle = '#f0c040';
     ctx.beginPath();
-    ctx.moveTo(bannerX, stringY - 8);
-    ctx.lineTo(bannerX - 12, stringY);
-    ctx.lineTo(bannerX, stringY + 8);
+    ctx.moveTo(arrowX, arrowY - 8);
+    ctx.lineTo(arrowX + 12, arrowY);
+    ctx.lineTo(arrowX, arrowY + 8);
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = '#fffdf0';
     ctx.beginPath();
-    ctx.moveTo(bannerX + 1, stringY - 5);
-    ctx.lineTo(bannerX - 7, stringY);
-    ctx.lineTo(bannerX + 1, stringY + 5);
+    ctx.moveTo(arrowX - 1, arrowY - 5);
+    ctx.lineTo(arrowX + 7, arrowY);
+    ctx.lineTo(arrowX - 1, arrowY + 5);
     ctx.closePath();
     ctx.fill();
 
-    // Banner text — title
-    const padding = 22;
-    ctx.fillStyle = '#2d3a5e';
-    ctx.font = `bold ${Math.round(bannerH * 0.32)}px 'Segoe UI', system-ui, sans-serif`;
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'left';
-    // Clip text to banner width
+    // Draw text on the banner using canvas transform to follow the wave at center
+    // Sample wave at 40% from anchor for text placement
+    const textT = 0.4;
+    const textX = anchorX - textT * bannerW;
+    const textCenterY = wavyY(textT);
+    // Angle: slope between t=0.3 and t=0.5
+    const t1 = 0.3, t2 = 0.5;
+    const dx = (anchorX - t2 * bannerW) - (anchorX - t1 * bannerW);
+    const dy = wavyY(t2) - wavyY(t1);
+    const angle = Math.atan2(dy, dx);
+
     ctx.save();
+    // Clip to banner shape so text doesn't spill out
     ctx.beginPath();
-    roundRect(ctx, bannerX + 1, bannerY + 1, bannerW - 2, bannerH - 2, radius - 1);
+    ctx.moveTo(topPts[0].x, topPts[0].y);
+    for (let i = 1; i < topPts.length; i++) ctx.lineTo(topPts[i].x, topPts[i].y);
+    for (let i = botPts.length - 1; i >= 0; i--) ctx.lineTo(botPts[i].x, botPts[i].y);
+    ctx.closePath();
     ctx.clip();
-    ctx.fillText(flyTitle, bannerX + padding, bannerY + bannerH * 0.34, bannerW - padding * 2);
-    // Banner text — time
+
+    ctx.translate(textX, textCenterY);
+    ctx.rotate(angle);
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#2d3a5e';
+    ctx.font = `bold ${titleSize}px 'Segoe UI', system-ui, sans-serif`;
+    ctx.fillText(flyTitle, 0, -titleSize * 0.45, bannerW * 0.75);
     ctx.fillStyle = '#b07800';
-    ctx.font = `600 ${Math.round(bannerH * 0.25)}px 'Segoe UI', system-ui, sans-serif`;
-    ctx.fillText(flyTime, bannerX + padding, bannerY + bannerH * 0.68, bannerW - padding * 2);
+    ctx.font = `600 ${timeSize}px 'Segoe UI', system-ui, sans-serif`;
+    ctx.fillText(flyTime, 0, timeSize * 0.65, bannerW * 0.75);
     ctx.restore();
 
-    // ── Plane emoji ──
-    ctx.font = `${planeSize}px serif`;
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'left';
-    ctx.fillText('✈️', planeX, planeY);
+    // ── Illustrated plane ──
+    drawPlane(ctx, planeX + planeSize, planeY + planeSize * 0.38, planeSize, elapsed);
 
     if (progress < 1) {
       animFrame = requestAnimationFrame(drawFrame);
     } else {
       dismissFlyover();
     }
+  }
+
+  // ── Illustrated propeller plane ──
+  // cx,cy = center of the plane body, size = rough wingspan
+  function drawPlane(ctx, cx, cy, size, elapsed) {
+    const s = size * 0.38; // scale unit
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // --- Engine exhaust puffs (behind/left of plane) ---
+    const puffAge = (elapsed % 400) / 400;
+    for (let i = 0; i < 3; i++) {
+      const t = ((elapsed - i * 130) % 400) / 400;
+      const px = -s * 2.2 - t * s * 1.8;
+      const py = s * 0.05;
+      const pr = s * (0.18 + t * 0.22);
+      ctx.globalAlpha = (1 - t) * 0.35;
+      ctx.fillStyle = '#cde8f5';
+      ctx.beginPath();
+      ctx.arc(px, py, pr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // --- Drop shadow on ground ---
+    ctx.save();
+    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = '#000';
+    ctx.scale(1, 0.25);
+    ctx.beginPath();
+    ctx.ellipse(0, s * 18, s * 2.2, s * 0.9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // --- Tail fin (vertical stabilizer) ---
+    ctx.fillStyle = '#e03030';
+    ctx.beginPath();
+    ctx.moveTo(-s * 1.6, -s * 0.15);
+    ctx.lineTo(-s * 1.1, -s * 1.05);
+    ctx.lineTo(-s * 0.55, -s * 0.15);
+    ctx.closePath();
+    ctx.fill();
+    // tail fin highlight
+    ctx.fillStyle = '#ff5555';
+    ctx.beginPath();
+    ctx.moveTo(-s * 1.5, -s * 0.15);
+    ctx.lineTo(-s * 1.15, -s * 0.85);
+    ctx.lineTo(-s * 0.8, -s * 0.15);
+    ctx.closePath();
+    ctx.fill();
+
+    // --- Horizontal stabilizer (rear small wings) ---
+    ctx.fillStyle = '#c0c8e0';
+    ctx.beginPath();
+    ctx.moveTo(-s * 1.55, s * 0.05);
+    ctx.lineTo(-s * 1.55, -s * 0.18);
+    ctx.lineTo(-s * 0.7, -s * 0.12);
+    ctx.lineTo(-s * 0.7, s * 0.08);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-s * 1.55, s * 0.05);
+    ctx.lineTo(-s * 1.55, s * 0.28);
+    ctx.lineTo(-s * 0.7, s * 0.22);
+    ctx.lineTo(-s * 0.7, s * 0.08);
+    ctx.closePath();
+    ctx.fill();
+
+    // --- Main fuselage body ---
+    const bodyGrad = ctx.createLinearGradient(0, -s * 0.45, 0, s * 0.45);
+    bodyGrad.addColorStop(0, '#f0f4ff');
+    bodyGrad.addColorStop(0.4, '#d8e4f8');
+    bodyGrad.addColorStop(1, '#b0c0dc');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.moveTo(s * 2.1, s * 0.05);         // nose tip
+    ctx.bezierCurveTo(s * 1.8, -s * 0.38, s * 0.5, -s * 0.42, -s * 0.5, -s * 0.38);
+    ctx.lineTo(-s * 1.7, -s * 0.22);
+    ctx.lineTo(-s * 1.7, s * 0.32);
+    ctx.lineTo(-s * 0.5, s * 0.42);
+    ctx.bezierCurveTo(s * 0.5, s * 0.42, s * 1.8, s * 0.38, s * 2.1, s * 0.05);
+    ctx.closePath();
+    ctx.fill();
+
+    // Fuselage outline
+    ctx.strokeStyle = '#8898b8';
+    ctx.lineWidth = s * 0.06;
+    ctx.stroke();
+
+    // Red stripe along fuselage
+    ctx.strokeStyle = '#e03030';
+    ctx.lineWidth = s * 0.09;
+    ctx.beginPath();
+    ctx.moveTo(s * 1.7, s * 0.08);
+    ctx.bezierCurveTo(s * 0.8, s * 0.08, -s * 0.2, s * 0.08, -s * 1.5, s * 0.02);
+    ctx.stroke();
+
+    // --- Main wings ---
+    const wingGrad = ctx.createLinearGradient(0, -s * 1.8, 0, s * 1.8);
+    wingGrad.addColorStop(0, '#c8d8f0');
+    wingGrad.addColorStop(0.5, '#e8f0ff');
+    wingGrad.addColorStop(1, '#b0c0dc');
+    ctx.fillStyle = wingGrad;
+    // Upper wing
+    ctx.beginPath();
+    ctx.moveTo(s * 0.6, -s * 0.3);
+    ctx.lineTo(-s * 0.3, -s * 0.3);
+    ctx.lineTo(-s * 1.5, -s * 1.85);
+    ctx.lineTo(-s * 0.5, -s * 1.85);
+    ctx.bezierCurveTo(s * 0.2, -s * 1.3, s * 0.5, -s * 0.7, s * 0.6, -s * 0.3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#8898b8';
+    ctx.lineWidth = s * 0.05;
+    ctx.stroke();
+    // Lower wing (mirror)
+    ctx.beginPath();
+    ctx.moveTo(s * 0.6, s * 0.3);
+    ctx.lineTo(-s * 0.3, s * 0.3);
+    ctx.lineTo(-s * 1.5, s * 1.85);
+    ctx.lineTo(-s * 0.5, s * 1.85);
+    ctx.bezierCurveTo(s * 0.2, s * 1.3, s * 0.5, s * 0.7, s * 0.6, s * 0.3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Wing detail lines
+    ctx.strokeStyle = '#a0b4d0';
+    ctx.lineWidth = s * 0.03;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.1, -s * 0.3);
+    ctx.lineTo(-s * 1.1, -s * 1.75);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(s * 0.1, s * 0.3);
+    ctx.lineTo(-s * 1.1, s * 1.75);
+    ctx.stroke();
+
+    // --- Cockpit windows ---
+    ctx.fillStyle = '#7dd4f8';
+    ctx.strokeStyle = '#5599cc';
+    ctx.lineWidth = s * 0.06;
+    // Main windshield
+    ctx.beginPath();
+    ctx.ellipse(s * 1.3, -s * 0.08, s * 0.38, s * 0.22, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Window gleam
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath();
+    ctx.ellipse(s * 1.22, -s * 0.14, s * 0.15, s * 0.09, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    // Side window
+    ctx.fillStyle = '#7dd4f8';
+    ctx.strokeStyle = '#5599cc';
+    ctx.lineWidth = s * 0.05;
+    ctx.beginPath();
+    ctx.ellipse(s * 0.7, -s * 0.26, s * 0.16, s * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // --- Propeller (spinning) ---
+    const propAngle = elapsed * 0.018;
+    ctx.save();
+    ctx.translate(s * 2.12, s * 0.05);
+    ctx.rotate(propAngle);
+    ctx.fillStyle = '#445577';
+    for (let b = 0; b < 3; b++) {
+      ctx.save();
+      ctx.rotate((b / 3) * Math.PI * 2);
+      ctx.beginPath();
+      ctx.ellipse(0, -s * 0.55, s * 0.1, s * 0.52, 0.15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    // Prop hub
+    ctx.fillStyle = '#778899';
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.restore();
   }
 
   function drawCloud(ctx, x, y, scale) {

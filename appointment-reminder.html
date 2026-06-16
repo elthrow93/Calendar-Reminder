@@ -417,16 +417,10 @@
     ctx.closePath();
     ctx.fill();
 
-    // Draw text on the banner using canvas transform to follow the wave at center
-    // Sample wave at 40% from anchor for text placement
+    // Draw text flat on the banner (no rotation — keeps it readable)
     const textT = 0.4;
     const textX = anchorX - textT * bannerW;
     const textCenterY = wavyY(textT);
-    // Angle: slope between t=0.3 and t=0.5
-    const t1 = 0.3, t2 = 0.5;
-    const dx = (anchorX - t2 * bannerW) - (anchorX - t1 * bannerW);
-    const dy = wavyY(t2) - wavyY(t1);
-    const angle = Math.atan2(dy, dx);
 
     ctx.save();
     // Clip to banner shape so text doesn't spill out
@@ -437,16 +431,14 @@
     ctx.closePath();
     ctx.clip();
 
-    ctx.translate(textX, textCenterY);
-    ctx.rotate(angle);
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#2d3a5e';
     ctx.font = `bold ${titleSize}px 'Segoe UI', system-ui, sans-serif`;
-    ctx.fillText(flyTitle, 0, -titleSize * 0.45, bannerW * 0.75);
+    ctx.fillText(flyTitle, textX, textCenterY - titleSize * 0.45, bannerW * 0.75);
     ctx.fillStyle = '#b07800';
     ctx.font = `600 ${timeSize}px 'Segoe UI', system-ui, sans-serif`;
-    ctx.fillText(flyTime, 0, timeSize * 0.65, bannerW * 0.75);
+    ctx.fillText(flyTime, textX, textCenterY + timeSize * 0.65, bannerW * 0.75);
     ctx.restore();
 
     // ── Illustrated plane ──

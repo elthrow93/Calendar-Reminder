@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>✈️ Appointment Reminder</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(135deg, #e0f0ff 0%, #f0e8ff 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 32px;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    color: #2d3a5e;
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .subtitle {
+    color: #6b7a9f;
+    font-size: 0.9rem;
+    text-align: center;
+    max-width: 380px;
+    line-height: 1.5;
+  }
+
+  .card {
+    background: white;
+    border-radius: 18px;
+    box-shadow: 0 4px 24px rgba(100,120,200,0.10);
+    padding: 28px 32px;
+    width: 100%;
+    max-width: 440px;
+  }
+
+  .card h2 {
+    font-size: 1rem;
+    color: #2d3a5e;
+    margin-bottom: 14px;
+    font-weight: 600;
+  }
+
+  button {
+    background: #4f7ef8;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 11px 22px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    width: 100%;
+    margin-top: 8px;
+  }
+  button:hover { background: #3a63d4; transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+
+  button.secondary {
+    background: #f0f3ff;
+    color: #4f7ef8;
+    margin-top: 6px;
+  }
+  button.secondary:hover { background: #dde4ff; }
+
+  #status {
+    font-size: 0.85rem;
+    color: #6b7a9f;
+    margin-top: 10px;
+    min-height: 18px;
+    text-align: center;
+  }
+  #status.error { color: #e05050; }
+  #status.ok { color: #3aaa6e; }
+
+  #upcoming {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .event-item {
+    background: #f5f7ff;
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.88rem;
+    color: #2d3a5e;
+  }
+  .event-item .time { color: #4f7ef8; font-weight: 700; min-width: 60px; }
+  .event-item .name { flex: 1; }
+  .event-item .badge {
+    font-size: 0.72rem;
+    background: #ffe0e0;
+    color: #c04040;
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-weight: 700;
+  }
+  .event-item .badge.soon {
+    background: #fff0cc;
+    color: #b07800;
+  }
+
+  /* ── Airplane flyover banner ── */
+  #flyover {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 80px;
+    z-index: 9999;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  #flyover.active { display: block; }
+
+  #flyover-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, #fffbe8 0%, #ffefc0 60%, #ffe0a0 100%);
+    border-bottom: 2px solid #f5c84a;
+    box-shadow: 0 4px 24px rgba(200,160,0,0.18);
+  }
+
+  #flyover-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #7a4f00;
+    white-space: nowrap;
+    text-align: center;
+    z-index: 2;
+    pointer-events: auto;
+  }
+  #flyover-text span { font-size: 0.85rem; font-weight: 400; }
+
+  #plane {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 2.2rem;
+    z-index: 3;
+    animation: fly-across 4.5s cubic-bezier(0.4,0,0.6,1) forwards;
+    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.12));
+  }
+
+  @keyframes fly-across {
+    0%   { left: -80px; opacity: 0; }
+    8%   { opacity: 1; }
+    85%  { opacity: 1; }
+    100% { left: calc(100% + 80px); opacity: 0; }
+  }
+
+  /* Clouds */
+  .cloud {
+    position: absolute;
+    font-size: 1.4rem;
+    opacity: 0.55;
+    top: 50%;
+    transform: translateY(-50%);
+    animation: drift 8s linear infinite;
+  }
+  .cloud:nth-child(1) { left: 15%; animation-delay: 0s; font-size: 1.1rem; }
+  .cloud:nth-child(2) { left: 45%; animation-delay: 2.5s; font-size: 1.6rem; }
+  .cloud:nth-child(3) { left: 75%; animation-delay: 1.2s; font-size: 1rem; }
+
+  @keyframes drift {
+    0%   { transform: translateY(-50%) translateX(0); }
+    50%  { transform: translateY(-55%) translateX(6px); }
+    100% { transform: translateY(-50%) translateX(0); }
+  }
+
+  .dismiss-btn {
+    position: absolute;
+    top: 8px;
+    right: 14px;
+    font-size: 1.1rem;
+    background: none;
+    border: none;
+    color: #b07800;
+    cursor: pointer;
+    width: auto;
+    margin: 0;
+    pointer-events: auto;
+  }
+  .dismiss-btn:hover { color: #7a4f00; }
+
+  /* Setup info */
+  .info-box {
+    background: #f0f5ff;
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 0.82rem;
+    color: #4a5a80;
+    line-height: 1.6;
+    max-width: 440px;
+    width: 100%;
+  }
+  .info-box code {
+    background: #dde6ff;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 0.82rem;
+    color: #2d3a5e;
+  }
+  .info-box a { color: #4f7ef8; text-decoration: none; }
+  .info-box a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<!-- ── Airplane Flyover Banner ── -->
+<div id="flyover">
+  <div id="flyover-bg"></div>
+  <span class="cloud">☁️</span>
+  <span class="cloud">☁️</span>
+  <span class="cloud">☁️</span>
+  <div id="plane">✈️</div>
+  <div id="flyover-text">
+    <strong id="flyover-title">Upcoming Meeting</strong><br>
+    <span id="flyover-time">starts in 5 minutes!</span>
+  </div>
+  <button class="dismiss-btn" onclick="dismissFlyover()" title="Dismiss">✕</button>
+</div>
+
+<!-- ── Main UI ── -->
+<h1>✈️ Appointment Reminder</h1>
+<p class="subtitle">Connects to your Google Calendar and flies a cute plane across your screen 5 minutes before each appointment.</p>
+
+<div class="card">
+  <h2>Step 1 — Sign in with Google</h2>
+  <button onclick="signIn()">Sign in with Google</button>
+  <button class="secondary" id="signout-btn" onclick="signOut()" style="display:none">Sign out</button>
+  <div id="status">Not connected.</div>
+</div>
+
+<div class="card" id="events-card" style="display:none">
+  <h2>Upcoming appointments (today)</h2>
+  <div id="upcoming"><em style="color:#aaa;font-size:0.85rem">Loading…</em></div>
+  <button class="secondary" onclick="loadEvents()" style="margin-top:14px">↻ Refresh</button>
+</div>
+
+<!-- Test button always visible once signed in -->
+<div class="card" id="test-card" style="display:none">
+  <h2>Test the reminder</h2>
+  <button class="secondary" onclick="triggerFlyover('Test Meeting', 'right now')">▶ Preview airplane flyover</button>
+</div>
+
+<div class="info-box">
+  <strong>📋 Setup instructions</strong><br><br>
+  This page uses the <strong>Google Calendar API</strong>. To connect your account:<br><br>
+  1. Open <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a><br>
+  2. Create a project → Enable <strong>Google Calendar API</strong><br>
+  3. Go to <strong>Credentials → Create OAuth 2.0 Client ID</strong> (Web application)<br>
+  4. Add <code>http://localhost</code> or your file path to Authorized JS Origins<br>
+  5. Copy your <strong>Client ID</strong> and paste it below, then save the file.<br><br>
+  <strong>Client ID:</strong> <code id="cid-display">not set — edit the HTML file</code><br><br>
+  <em>Your data stays on your computer and is never sent anywhere except Google.</em>
+</div>
+
+<script>
+  // ── CONFIGURATION ── paste your Google OAuth Client ID here ──
+  const CLIENT_ID = '1080333216235-q7ue5l74p7q7617f0hirddcbs7864bt8.apps.googleusercontent.com';
+  const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
+
+  // ── State ──
+  let tokenClient;
+  let accessToken = null;
+  let checkInterval = null;
+  let notifiedEvents = new Set();
+
+  // Show client ID hint
+  if (CLIENT_ID !== 'YOUR_GOOGLE_CLIENT_ID_HERE') {
+    document.getElementById('cid-display').textContent = CLIENT_ID.slice(0, 24) + '…';
+  }
+
+  // ── Load Google Identity Services ──
+  const gisScript = document.createElement('script');
+  gisScript.src = 'https://accounts.google.com/gsi/client';
+  gisScript.onload = initGIS;
+  document.head.appendChild(gisScript);
+
+  function initGIS() {
+    if (CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
+      setStatus('⚠️ Please add your Google Client ID to the HTML file first.', 'error');
+      return;
+    }
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: onTokenReceived,
+    });
+    setStatus('Ready. Click "Sign in with Google" to connect.', '');
+  }
+
+  function signIn() {
+    if (!tokenClient) {
+      setStatus('Please add your Google Client ID first.', 'error');
+      return;
+    }
+    tokenClient.requestAccessToken();
+  }
+
+  function signOut() {
+    if (accessToken) google.accounts.oauth2.revoke(accessToken);
+    accessToken = null;
+    clearInterval(checkInterval);
+    document.getElementById('events-card').style.display = 'none';
+    document.getElementById('test-card').style.display = 'none';
+    document.getElementById('signout-btn').style.display = 'none';
+    setStatus('Signed out.', '');
+  }
+
+  function onTokenReceived(resp) {
+    if (resp.error) { setStatus('Sign-in failed: ' + resp.error, 'error'); return; }
+    accessToken = resp.access_token;
+    setStatus('✅ Connected to Google Calendar!', 'ok');
+    document.getElementById('events-card').style.display = 'block';
+    document.getElementById('test-card').style.display = 'block';
+    document.getElementById('signout-btn').style.display = 'block';
+    loadEvents();
+    // Check every 60 seconds
+    clearInterval(checkInterval);
+    checkInterval = setInterval(checkUpcoming, 60000);
+  }
+
+  // ── Fetch today's events ──
+  async function loadEvents() {
+    if (!accessToken) return;
+    const el = document.getElementById('upcoming');
+    el.innerHTML = '<em style="color:#aaa;font-size:0.85rem">Loading…</em>';
+
+    const now = new Date();
+    const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
+
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?`
+      + `timeMin=${now.toISOString()}&timeMax=${endOfDay.toISOString()}`
+      + `&singleEvents=true&orderBy=startTime&maxResults=15`;
+
+    try {
+      const res = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } });
+      const data = await res.json();
+      renderEvents(data.items || []);
+    } catch(e) {
+      el.innerHTML = '<em style="color:#e05050">Failed to load events.</em>';
+    }
+  }
+
+  function renderEvents(events) {
+    const el = document.getElementById('upcoming');
+    if (!events.length) { el.innerHTML = '<em style="color:#aaa;font-size:0.85rem">No more events today 🎉</em>'; return; }
+
+    el.innerHTML = '';
+    const now = Date.now();
+    events.forEach(ev => {
+      const start = ev.start?.dateTime ? new Date(ev.start.dateTime) : null;
+      if (!start) return;
+      const minsLeft = Math.round((start - now) / 60000);
+      const timeStr = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const div = document.createElement('div');
+      div.className = 'event-item';
+      let badge = '';
+      if (minsLeft <= 5 && minsLeft >= 0) badge = `<span class="badge">NOW</span>`;
+      else if (minsLeft <= 15) badge = `<span class="badge soon">${minsLeft}m</span>`;
+      div.innerHTML = `<span class="time">${timeStr}</span><span class="name">${ev.summary || 'Untitled'}</span>${badge}`;
+      el.appendChild(div);
+    });
+  }
+
+  // ── Check for events 5 minutes away ──
+  async function checkUpcoming() {
+    if (!accessToken) return;
+    const now = new Date();
+    const inSix = new Date(now.getTime() + 6 * 60000);
+
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?`
+      + `timeMin=${now.toISOString()}&timeMax=${inSix.toISOString()}`
+      + `&singleEvents=true&orderBy=startTime&maxResults=5`;
+
+    try {
+      const res = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } });
+      const data = await res.json();
+      (data.items || []).forEach(ev => {
+        const start = ev.start?.dateTime ? new Date(ev.start.dateTime) : null;
+        if (!start) return;
+        const minsLeft = (start - Date.now()) / 60000;
+        const key = ev.id + start.toISOString();
+        if (minsLeft >= 4.5 && minsLeft <= 6 && !notifiedEvents.has(key)) {
+          notifiedEvents.add(key);
+          triggerFlyover(ev.summary || 'Meeting', `starts at ${start.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`);
+        }
+      });
+      loadEvents(); // refresh list
+    } catch(e) { /* silent */ }
+  }
+
+  // ── Fly the plane! ──
+  function triggerFlyover(title, timeLabel) {
+    document.getElementById('flyover-title').textContent = title;
+    document.getElementById('flyover-time').textContent = timeLabel;
+
+    const flyover = document.getElementById('flyover');
+    const plane = document.getElementById('plane');
+
+    // Reset animation
+    flyover.classList.add('active');
+    plane.style.animation = 'none';
+    void plane.offsetWidth; // reflow
+    plane.style.animation = '';
+
+    // Auto-dismiss after 6s
+    setTimeout(() => flyover.classList.remove('active'), 6000);
+  }
+
+  function dismissFlyover() {
+    document.getElementById('flyover').classList.remove('active');
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = type;
+  }
+</script>
+</body>
+</html>
